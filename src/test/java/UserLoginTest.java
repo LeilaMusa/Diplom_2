@@ -1,5 +1,7 @@
 import client.RestClient;
 import io.qameta.allure.junit4.DisplayName;
+import io.qameta.allure.Description;
+import io.qameta.allure.Step;
 import io.restassured.response.Response;
 import model.User;
 import model.UserCredentials;
@@ -14,51 +16,92 @@ public class UserLoginTest {
     private User user;
 
     @Before
+    @Step("Настройка тестового окружения")
     public void setUp() {
         client = new RestClient();
-        user = User.builder()
-                .email("test" + System.currentTimeMillis() + "@test.com")
-                .password("password123")
-                .name("TestUser")
-                .build();
-        accessToken = client.createUser(user).path("accessToken");
+        user = createUser("test" + System.currentTimeMillis() + "@test.com", "password123", "TestUser");
+        accessToken = createUserViaApi(user).path("accessToken");
     }
 
     @After
+    @Step("Очистка тестового окружения")
     public void tearDown() {
         if (accessToken != null) {
-            client.deleteUser(accessToken);
+            deleteUser(accessToken);
         }
     }
 
     @Test
-    @DisplayName("Login with valid credentials")
+    @DisplayName("Логин с валидными данными")
+    @Description("Тест проверяет успешный логин с корректными email и паролем")
     public void loginValidCredentialsTest() {
-        UserCredentials credentials = UserCredentials.builder()
-                .email(user.getEmail())
-                .password(user.getPassword())
+        UserCredentials credentials = createCredentials(user.getEmail(), user.getPassword());
+        Response response = loginUser(credentials);
+        validateSuccessfulLogin(response);
+    }
+
+    @Test
+    @DisplayName("Логин с неверным email")
+    @Description("Тест проверяет, что логин невозможен с неверным email")
+    public void loginWithInvalidEmailTest() {
+        UserCredentials credentials = createCredentials("wrong@email.com", user.getPassword());
+        Response response = loginUser(credentials);
+        validateFailedLogin(response);
+    }
+
+    @Test
+    @DisplayName("Логин с неверным паролем")
+    @Description("Тест проверяет, что логин невозможен с неверным паролем")
+    public void loginWithInvalidPasswordTest() {
+        UserCredentials credentials = createCredentials(user.getEmail(), "wrongpassword");
+        Response response = loginUser(credentials);
+        validateFailedLogin(response);
+    }
+
+    @Step("Создание пользователя с email = {email}, password = {password}, name = {name}")
+    private User createUser(String email, String password, String name) {
+        return User.builder()
+                .email(email)
+                .password(password)
+                .name(name)
                 .build();
+    }
 
-        Response response = client.loginUser(credentials);
+    @Step("Создание пользователя через API")
+    private Response createUserViaApi(User user) {
+        return client.createUser(user);
+    }
 
+    @Step("Создание учётных данных с email = {email}, password = {password}")
+    private UserCredentials createCredentials(String email, String password) {
+        return UserCredentials.builder()
+                .email(email)
+                .password(password)
+                .build();
+    }
+
+    @Step("Логин пользователя")
+    private Response loginUser(UserCredentials credentials) {
+        return client.loginUser(credentials);
+    }
+
+    @Step("Проверка успешного логина")
+    private void validateSuccessfulLogin(Response response) {
         response.then()
                 .statusCode(200)
                 .body("success", equalTo(true));
     }
 
-    @Test
-    @DisplayName("Login with invalid credentials")
-    public void loginInvalidCredentialsTest() {
-        UserCredentials credentials = UserCredentials.builder()
-                .email("wrong@email.com")
-                .password("wrongpassword")
-                .build();
-
-        Response response = client.loginUser(credentials);
-
+    @Step("Проверка неудачного логина")
+    private void validateFailedLogin(Response response) {
         response.then()
                 .statusCode(401)
                 .body("success", equalTo(false))
                 .body("message", equalTo("email or password are incorrect"));
+    }
+
+    @Step("Удаление пользователя с токеном {accessToken}")
+    private void deleteUser(String accessToken) {
+        client.deleteUser(accessToken);
     }
 }

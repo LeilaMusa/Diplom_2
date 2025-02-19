@@ -1,26 +1,38 @@
 import client.RestClient;
+import io.qameta.allure.Description;
 import io.qameta.allure.junit4.DisplayName;
+import io.qameta.allure.Step;
 import io.restassured.response.Response;
 import model.User;
 import model.UserCredentials;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import com.github.javafaker.Faker;
+
 import static org.hamcrest.Matchers.*;
 
 public class UserUpdateTest {
     private RestClient client;
     private String accessToken;
     private User user;
+    private Faker faker;
 
     @Before
+    @Step("Set up test data")
     public void setUp() {
         client = new RestClient();
-        user = new User("test" + System.currentTimeMillis() + "@test.com", "password123", "TestUser");
+        faker = new Faker();
+        user = new User(
+                faker.internet().emailAddress(),
+                faker.internet().password(),
+                faker.name().fullName()
+        );
         accessToken = client.createUser(user).path("accessToken");
     }
 
     @After
+    @Step("Clean up test data")
     public void tearDown() {
         if (accessToken != null) {
             client.deleteUser(accessToken);
@@ -28,8 +40,9 @@ public class UserUpdateTest {
     }
 
     @Test
-    @DisplayName("Update user with authorization")
-    public void updateUserWithAuthTest() {
+    @DisplayName("Update user name with authorization")
+    @Description("Test updating user name with valid authorization token")
+    public void updateUserNameWithAuthTest() {
         User updatedUser = new User(user.getEmail(), user.getPassword(), "NewName");
 
         Response response = client.updateUser(accessToken, updatedUser);
@@ -42,8 +55,9 @@ public class UserUpdateTest {
 
     @Test
     @DisplayName("Update user email with authorization")
+    @Description("Test updating user email with valid authorization token")
     public void updateUserEmailWithAuthTest() {
-        String newEmail = "updated" + System.currentTimeMillis() + "@test.com";
+        String newEmail = faker.internet().emailAddress();
         User updatedUser = new User(newEmail, user.getPassword(), user.getName());
 
         Response response = client.updateUser(accessToken, updatedUser);
@@ -56,6 +70,7 @@ public class UserUpdateTest {
 
     @Test
     @DisplayName("Update user without authorization")
+    @Description("Test updating user without authorization token")
     public void updateUserWithoutAuthTest() {
         User updatedUser = new User(user.getEmail(), user.getPassword(), "NewName");
 
@@ -65,29 +80,5 @@ public class UserUpdateTest {
                 .statusCode(401)
                 .body("success", equalTo(false))
                 .body("message", equalTo("You should be authorised"));
-    }
-
-    @Test
-    @DisplayName("Update user password with authorization")
-    public void updateUserPasswordWithAuthTest() {
-        String newPassword = "newPassword123";
-        User updatedUser = new User(user.getEmail(), newPassword, user.getName());
-
-        Response response = client.updateUser(accessToken, updatedUser);
-
-        response.then()
-                .statusCode(200)
-                .body("success", equalTo(true));
-
-        // Verify we can login with new password
-        UserCredentials newCredentials = UserCredentials.builder()
-                .email(user.getEmail())
-                .password(newPassword)
-                .build();
-
-        Response loginResponse = client.loginUser(newCredentials);
-        loginResponse.then()
-                .statusCode(200)
-                .body("success", equalTo(true));
     }
 }

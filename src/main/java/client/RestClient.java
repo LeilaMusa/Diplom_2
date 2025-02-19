@@ -120,4 +120,30 @@ public class RestClient {
             throw e;
         }
     }
+
+    @Step("Reset user password")
+    public Response resetPassword(UserCredentials credentials) {
+        try {
+            return given()
+                    .contentType(ContentType.JSON)
+                    .body(credentials)
+                    .post(ApiEndpoints.PASSWORD_RESET);
+        } catch (Exception e) {
+            logger.error("Error resetting password: {}", e.getMessage());
+            throw e;
+        }
+    }
+
+    @Step("Reset user password with token")
+    public Response resetPasswordWithToken(String newPassword, String resetToken) {
+        try {
+            return given()
+                    .contentType(ContentType.JSON)
+                    .body("{\"password\": \"" + newPassword + "\", \"token\": \"" + resetToken + "\"}")
+                    .post(ApiEndpoints.PASSWORD_RESET_RESET);
+        } catch (Exception e) {
+            logger.error("Error resetting password with token: {}", e.getMessage());
+            throw e;
+        }
+    }
 }
