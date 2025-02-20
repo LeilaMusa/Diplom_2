@@ -9,18 +9,20 @@ import model.User;
 import model.UserCredentials;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.gson.Gson;
 
 import static io.restassured.RestAssured.given;
 
 public class RestClient {
     private static final Logger logger = LoggerFactory.getLogger(RestClient.class);
+    private static final Gson gson = new Gson();
 
     @Step("Create user")
     public Response createUser(User user) {
         try {
             return given()
                     .contentType(ContentType.JSON)
-                    .body(user)
+                    .body(gson.toJson(user))
                     .post(ApiEndpoints.REGISTER);
         } catch (Exception e) {
             logger.error("Error creating user: {}", e.getMessage());
@@ -33,7 +35,7 @@ public class RestClient {
         try {
             return given()
                     .contentType(ContentType.JSON)
-                    .body(credentials)
+                    .body(gson.toJson(credentials))
                     .post(ApiEndpoints.LOGIN);
         } catch (Exception e) {
             logger.error("Error logging in user: {}", e.getMessage());
@@ -48,7 +50,7 @@ public class RestClient {
                     .contentType(ContentType.JSON)
                     .when()
                     .headers(accessToken != null ? "Authorization" : "", accessToken != null ? accessToken : "")
-                    .body(user)
+                    .body(gson.toJson(user))
                     .patch(ApiEndpoints.USER);
         } catch (Exception e) {
             logger.error("Error updating user: {}", e.getMessage());
@@ -63,7 +65,7 @@ public class RestClient {
                     .contentType(ContentType.JSON)
                     .when()
                     .headers(accessToken != null ? "Authorization" : "", accessToken != null ? accessToken : "")
-                    .body(order)
+                    .body(gson.toJson(order))
                     .post(ApiEndpoints.ORDERS);
         } catch (Exception e) {
             logger.error("Error creating order: {}", e.getMessage());
@@ -102,7 +104,7 @@ public class RestClient {
         try {
             return given()
                     .contentType(ContentType.JSON)
-                    .body("{\"token\": \"" + refreshToken + "\"}")
+                    .body(gson.toJson(new LogoutRequest(refreshToken)))
                     .post(ApiEndpoints.LOGOUT);
         } catch (Exception e) {
             logger.error("Error logging out user: {}", e.getMessage());
@@ -126,7 +128,7 @@ public class RestClient {
         try {
             return given()
                     .contentType(ContentType.JSON)
-                    .body(credentials)
+                    .body(gson.toJson(credentials))
                     .post(ApiEndpoints.PASSWORD_RESET);
         } catch (Exception e) {
             logger.error("Error resetting password: {}", e.getMessage());
@@ -137,13 +139,33 @@ public class RestClient {
     @Step("Reset user password with token")
     public Response resetPasswordWithToken(String newPassword, String resetToken) {
         try {
+            PasswordResetRequest request = new PasswordResetRequest(newPassword, resetToken);
             return given()
                     .contentType(ContentType.JSON)
-                    .body("{\"password\": \"" + newPassword + "\", \"token\": \"" + resetToken + "\"}")
+                    .body(gson.toJson(request))
                     .post(ApiEndpoints.PASSWORD_RESET_RESET);
         } catch (Exception e) {
             logger.error("Error resetting password with token: {}", e.getMessage());
             throw e;
+        }
+    }
+
+    // Вспомогательные классы для сериализации
+    private static class LogoutRequest {
+        private final String token;
+
+        public LogoutRequest(String token) {
+            this.token = token;
+        }
+    }
+
+    private static class PasswordResetRequest {
+        private final String password;
+        private final String token;
+
+        public PasswordResetRequest(String password, String token) {
+            this.password = password;
+            this.token = token;
         }
     }
 }
